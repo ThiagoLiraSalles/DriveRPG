@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DriveRPG</title>
-  
-  <!-- VÍNCULO DO CSS: Garante que o visual minimalista escuro seja carregado -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -86,14 +84,14 @@
     </div>
   </section>
 
-  <!-- NAVBAR -->
+  <!-- NAVBAR COMPACTA -->
   <nav id="navbar" class="navbar hidden">
     <button class="navBtn active" data-page="searchPage" type="button" title="Pesquisa">
       <span class="navIcon">🔍</span>
     </button>
 
     <button id="editorNav" class="navBtn hidden" data-page="editorPage" type="button" title="Criar Ficha">
-      <span class="navIcon">🗂️</span>
+      <span class="navIcon">📝</span>
     </button>
 
     <button class="navBtn" data-page="profilePage" type="button" title="Perfil">
@@ -101,25 +99,16 @@
     </button>
 
     <button id="logoutBtn" class="navBtn logoutBtn" type="button" title="Sair">
-      <span class="navIcon">↪️</span>
+      <span class="navIcon">🚪</span>
     </button>
   </nav>
 
-  <!-- ============================================================ -->
-  <!-- SCRIPTS EXTERNOS DO FIREBASE (OBRIGATÓRIOS PARA WEB/PRODUÇÃO)-->
-  <!-- ============================================================ -->
-  <!-- Núcleo do Firebase SDK -->
+  <!-- SCRIPTS EXTERNOS DO FIREBASE (Carregam antes do script principal) -->
   <script src="https://gstatic.com"></script>
-  <!-- Recursos de Autenticação -->
   <script src="https://gstatic.com"></script>
-  <!-- Banco de Dados Firestore -->
   <script src="https://gstatic.com"></script>
 
-  <!-- VÍNCULO DO SEU JAVASCRIPT LOGICO (Deve ser o último da lista) -->
-  <script src="script.js"></script>
-  <script src="https://gstatic.com"></script>
-  <script src="https://gstatic.com"></script>
-  <script src="https://gstatic.com"></script>
+  <!-- SEU CODIGO COM DEFER (Espera as bibliotecas carregarem na memória) -->
   <script src="script.js" defer></script>
 </body>
 </html>
