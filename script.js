@@ -1,27 +1,34 @@
 /* FIREBASE CONFIG */
 const firebaseConfig = {
   apiKey: "AIzaSyBIDfCfu2rQR0jf5l-3WFIYkspD8DRi4-s",
-  authDomain: "://firebaseapp.com", // CORRIGIDO: Link completo restabelecido
+  authDomain: "://firebaseapp.com",
   projectId: "driverpg-2c066",
   storageBucket: "driverpg-2c066.firebasestorage.app",
 };
 
-// Inicializa o app principal se não estiver inicializado
-if(!firebase.apps.length){
-  firebase.initializeApp(firebaseConfig);
-}
+// Inicialização ultra segura: evita erros de carregamento e conflitos no CodePen/Vercel
+let auth = null;
+let db = null;
+let adminAuth = null;
 
-const auth = firebase.auth();
-const db = firebase.firestore();
+if (typeof firebase !== 'undefined') {
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+  auth = firebase.auth();
+  db = firebase.firestore();
 
-// CORRIGIDO: Inicialização segura do app secundário para evitar erros de execução no Vercel
-let adminApp;
-if (!firebase.apps.find(app => app.name === "AdminApp")) {
-  adminApp = firebase.initializeApp(firebaseConfig, "AdminApp");
+  // Inicializa o app secundário para cadastro sem deslogar o Master atual
+  let adminApp;
+  if (!firebase.apps.find(app => app.name === "AdminApp")) {
+    adminApp = firebase.initializeApp(firebaseConfig, "AdminApp");
+  } else {
+    adminApp = firebase.app("AdminApp");
+  }
+  adminAuth = firebase.auth(adminApp);
 } else {
-  adminApp = firebase.app("AdminApp");
+  console.error("Firebase SDK não foi detectado. Certifique-se de que as ferramentas estão carregadas nas configurações do CodePen.");
 }
-const adminAuth = firebase.auth(adminApp);
 
 /* ELEMENTOS DO DOM */
 const loginBtn = document.getElementById("loginBtn");
@@ -40,7 +47,7 @@ const searchInput = document.getElementById("searchInput");
 const descricaoEditor = document.getElementById("descricaoFicha");
 
 let editingFichaId = null; 
-let usuarioLogadoCargo = "Membro"; // Padrão seguro de inicialização
+let usuarioLogadoCargo = "Membro"; // Inicialização padrão de segurança
 
 /* NAVEGAÇÃO ENTRE PÁGINAS */
 function showPage(pageId){
@@ -78,7 +85,7 @@ function inserirImagemUrl() {
   }
 }
 
-/* INTERCEPTADOR DE COLAGEM: COPIA 100% DA FORMATAÇÃO ORIGINAL (WORD, GOOGLE DOCS E IMAGENS) */
+/* INTERCEPTADOR DE COLAGEM: PRESERVA 100% DA FORMATAÇÃO ORIGINAL (WORD, GOOGLE DOCS E IMAGENS COPIADAS) */
 if(descricaoEditor) {
   descricaoEditor.addEventListener("paste", function(e) {
     e.preventDefault();
@@ -96,6 +103,11 @@ if(descricaoEditor) {
 
 /* LÓGICA DE LOGIN */
 async function login(){
+  if (!auth) {
+    alert("O sistema do Firebase ainda está carregando no CodePen. Aguarde um segundo.");
+    return;
+  }
+
   const email = document.getElementById("email").value.trim();
   const senha = document.getElementById("senha").value.trim();
 
@@ -116,111 +128,119 @@ async function login(){
     loginBtn.innerText = "Entrar";
   }
 }
-if(loginBtn) loginBtn.onclick = login;
+
+if(loginBtn) {
+  loginBtn.onclick = login;
+}
 
 if(logoutBtn) {
   logoutBtn.onclick = async () => {
-    await auth.signOut();
-    location.reload();
+    if(auth) {
+      await auth.signOut();
+      location.reload();
+    }
   };
 }
 
-/* OBSERVADOR DE ESTADO DE AUTENTICAÇÃO (CONTROLE DE CARGOS E PERMISSÕES) */
-let unsubscribeFichas = null;
-
-auth.onAuthStateChanged(async user => {
-  if(!user){
-    if(unsubscribeFichas) unsubscribeFichas();
-    navbar.classList.add("hidden");
-    userArea.classList.remove("active");
-    showPage("loginPage");
-    return;
-  }
-
-  try {
-    const userDoc = await db.collection("usuarios").doc(user.uid).get();
-    let dadosUser = { nome: "Thiago", cargo: "Master" }; // Padrão de fallback condizente com a conta principal
-
-    if(userDoc.exists) {
-      dadosUser = userDoc.data();
+/* OBSERVADOR DE AUTENTICAÇÃO (ROLES, INTERFACE E REGRAS DE CARGOS) */
+if (auth) {
+  auth.onAuthStateChanged(async user => {
+    if(!user){
+      if(unsubscribeFichas) unsubscribeFichas();
+      navbar.classList.add("hidden");
+      userArea.classList.remove("active");
+      showPage("loginPage");
+      return;
     }
 
-    usuarioLogadoCargo = dadosUser.cargo;
+    try {
+      const userDoc = await db.collection("usuarios").doc(user.uid).get();
+      let dadosUser = { nome: "Thiago", cargo: "Master" }; // Padrão caso o documento não exista no banco ainda
 
-    topUsername.innerText = dadosUser.nome;
-    topCargo.innerText = dadosUser.cargo;
-    userArea.classList.add("active");
-    navbar.classList.remove("hidden");
+      if(userDoc.exists) {
+        dadosUser = userDoc.data();
+      }
 
-    profileInfo.innerHTML = `
-      <b>Nome:</b> ${dadosUser.nome}<br>
-      <b>E-mail:</b> ${user.email}<br>
-      <b>Cargo atual:</b> ${dadosUser.cargo}
-    `;
+      usuarioLogadoCargo = dadosUser.cargo;
 
-    // REGRAS DE EXIBIÇÃO DE INTERFACE POR CARGO:
-    // Editores e Masters podem acessar a aba de criação de fichas
-    if(usuarioLogadoCargo === "Master" || usuarioLogadoCargo === "Editor") {
-      editorNav.classList.remove("hidden");
-    } else {
-      editorNav.classList.add("hidden"); // Membros apenas pesquisam e deslogam
+      topUsername.innerText = dadosUser.nome;
+      topCargo.innerText = dadosUser.cargo;
+      userArea.classList.add("active");
+      navbar.classList.remove("hidden");
+
+      profileInfo.innerHTML = `
+        <b>Nome:</b> ${dadosUser.nome}<br>
+        <b>E-mail:</b> ${user.email}<br>
+        <b>Cargo atual:</b> ${dadosUser.cargo}
+      `;
+
+      // REGRAS DE VISIBILIDADE DA BARRA DE NAVEGAÇÃO:
+      // Editores e Masters podem criar fichas
+      if(usuarioLogadoCargo === "Master" || usuarioLogadoCargo === "Editor") {
+        editorNav.classList.remove("hidden");
+      } else {
+        editorNav.classList.add("hidden"); // Membros apenas buscam e deslogam
+      }
+
+      // Caixa de criação de logins adicionada dentro do Perfil (Visível apenas para o Master)
+      if(usuarioLogadoCargo === "Master") {
+        masterAdminBox.classList.remove("hidden");
+      } else {
+        masterAdminBox.classList.add("hidden");
+      }
+
+      showPage("searchPage");
+      carregarFichas();
+
+    } catch(err) {
+      console.error("Erro ao processar dados de acesso: ", err);
     }
-
-    // Apenas o cargo Master vê a caixa de gerenciamento/criação de contas no Perfil
-    if(usuarioLogadoCargo === "Master") {
-      masterAdminBox.classList.remove("hidden");
-    } else {
-      masterAdminBox.classList.add("hidden");
-    }
-
-    showPage("searchPage");
-    carregarFichas();
-
-  } catch(err) {
-    console.error("Erro ao ler dados do usuário: ", err);
-  }
-});
+  });
+}
 
 /* CRIAR OU ATUALIZAR FICHA */
-saveFichaBtn.onclick = async () => {
-  const nome = document.getElementById("nomeFicha").value.trim();
-  const descricaoHTML = descricaoEditor.innerHTML;
+if(saveFichaBtn) {
+  saveFichaBtn.onclick = async () => {
+    if (!db) return;
+    const nome = document.getElementById("nomeFicha").value.trim();
+    const descricaoHTML = descricaoEditor.innerHTML;
 
-  if(!nome || !descricaoHTML || descricaoHTML === "<br>" || descricaoHTML.trim() === ""){
-    alert("Insira os dados da ficha.");
-    return;
-  }
-
-  try {
-    saveFichaBtn.disabled = true;
-    
-    if(editingFichaId) {
-      // Atualização de Ficha Existente (Editor ou Master)
-      await db.collection("fichas").doc(editingFichaId).update({
-        nome: nome,
-        descricao: descricaoHTML,
-        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      alert("Ficha editada e salva com sucesso!");
-    } else {
-      // Criação de Nova Ficha (Editor ou Master)
-      await db.collection("fichas").add({
-        nome: nome,
-        descricao: descricaoHTML,
-        criadoPor: auth.currentUser.uid,
-        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      alert("Nova ficha cadastrada!");
+    if(!nome || !descricaoHTML || descricaoHTML === "<br>" || descricaoHTML.trim() === ""){
+      alert("Por favor, preencha o nome e o conteúdo da ficha.");
+      return;
     }
 
-    limparFormularioFicha();
-    showPage("searchPage");
-  } catch(err) {
-    alert("Erro operacional ao salvar ficha: " + err.message);
-  } finally {
-    saveFichaBtn.disabled = false;
-  }
-};
+    try {
+      saveFichaBtn.disabled = true;
+      
+      if(editingFichaId) {
+        // Modo Edição (Apenas Editor e Master)
+        await db.collection("fichas").doc(editingFichaId).update({
+          nome: nome,
+          descricao: descricaoHTML,
+          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        alert("Ficha atualizada com sucesso!");
+      } else {
+        // Modo Criação (Apenas Editor e Master)
+        await db.collection("fichas").add({
+          nome: nome,
+          descricao: descricaoHTML,
+          criadoPor: auth.currentUser.uid,
+          criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        alert("Ficha criada com sucesso!");
+      }
+
+      limparFormularioFicha();
+      showPage("searchPage");
+    } catch(err) {
+      alert("Erro ao tentar salvar os dados: " + err.message);
+    } finally {
+      saveFichaBtn.disabled = false;
+    }
+  };
+}
 
 function limparFormularioFicha() {
   editingFichaId = null;
@@ -230,21 +250,25 @@ function limparFormularioFicha() {
   saveFichaBtn.innerText = "Salvar Ficha";
 }
 
-/* CARREGAR FICHAS EM TEMPO REAL */
+/* ESCUTA E CARREGA O BANCO DE FICHAS EM TEMPO REAL */
+let unsubscribeFichas = null;
 function carregarFichas() {
+  if(!db) return;
   if(unsubscribeFichas) unsubscribeFichas();
 
   unsubscribeFichas = db.collection("fichas").orderBy("criadoEm", "desc")
     .onSnapshot(snapshot => {
       renderizarFichas(snapshot.docs);
-    }, err => console.error("Erro ao carregar banco em tempo real: ", err));
+    }, err => console.error("Erro ao ler atualizações: ", err));
 }
 
-/* RENDERIZAR FICHAS E APLICAR BOTÕES DE ACORDO COM O CARGO */
+/* CONSTRÓI AS FICHAS NA TELA RESPEITANDO OS NÍVEIS DE PERMISSÃO */
 function renderizarFichas(docs) {
+  if(!listaFichas) return;
   listaFichas.innerHTML = "";
+  
   if(docs.length === 0) {
-    listaFichas.innerHTML = "<p style='opacity:0.5;text-align:center;'>Nenhuma ficha cadastrada.</p>";
+    listaFichas.innerHTML = "<p style='opacity:0.5;text-align:center;'>Nenhuma ficha cadastrada na mesa.</p>";
     return;
   }
 
@@ -256,8 +280,8 @@ function renderizarFichas(docs) {
     const conteudoExibicao = data.descricao.includes("<") ? data.descricao : data.descricao.replace(/\n/g, "<br>");
     let acoesHtml = "";
     
-    // REGRAS DE PERMISSÃO PARA AÇÃO:
-    // Apenas Masters e Editores recebem os controles visuais de modificação/exclusão
+    // REGRAS DE CARGO PARA EXIBIÇÃO DE CONTROLES:
+    // Apenas Masters e Editores visualizam e operam as ações de Editar e Excluir
     if(usuarioLogadoCargo === "Master" || usuarioLogadoCargo === "Editor") {
        acoesHtml = `
         <div class="ficha-actions">
@@ -276,8 +300,9 @@ function renderizarFichas(docs) {
   });
 }
 
-/* PREPARAR EDIÇÃO DE FICHA EXISTENTE */
+/* CARREGA OS DADOS NO FORMULÁRIO DO EDITOR */
 window.prepararEdicao = async function(id) {
+  if(!db) return;
   try {
     const doc = await db.collection("fichas").doc(id).get();
     if(doc.exists) {
@@ -289,23 +314,24 @@ window.prepararEdicao = async function(id) {
       showPage("editorPage");
     }
   } catch(err) {
-    alert("Erro ao resgatar documento: " + err.message);
+    alert("Erro ao buscar dados da ficha: " + err.message);
   }
 };
 
-/* EXCLUIR FICHA PERMANENTEMENTE */
+/* DELETAR FICHA (EDITOR E MASTER) */
 window.deletarFicha = async function(id) {
-  if(confirm("Tem certeza absoluta de que deseja excluir permanentemente esta ficha?")) {
+  if(!db) return;
+  if(confirm("Tem certeza de que deseja deletar permanentemente esta ficha?")) {
     try {
       await db.collection("fichas").doc(id).delete();
-      alert("Ficha excluída com sucesso.");
+      alert("A ficha foi removida do sistema.");
     } catch(err) {
-      alert("Erro ao tentar excluir a ficha: " + err.message);
+      alert("Não foi possível excluir o arquivo: " + err.message);
     }
   }
 };
 
-/* BUSCA DINÂMICA EM TEMPO REAL (CLIENT-SIDE) */
+/* FILTRO DE PESQUISA EM TEMPO REAL */
 if(searchInput) {
   searchInput.oninput = () => {
     const filtro = searchInput.value.toLowerCase();
@@ -320,46 +346,53 @@ if(searchInput) {
   };
 }
 
-/* CADASTRO DE LOGINS (EXCLUSIVO DO CARGO MASTER - DENTRO DA SEÇÃO DE PERFIL) */
-createAdminUserBtn.onclick = async () => {
-  const nome = document.getElementById("newAdminNome").value.trim();
-  const email = document.getElementById("newAdminEmail").value.trim();
-  const senha = document.getElementById("newAdminSenha").value.trim();
-  const cargo = document.getElementById("newAdminCargo").value;
+/* CRIAÇÃO DE NOVOS LOGINS (EXCLUSIVO DO CARGO MASTER - DENTRO DO PERFIL) */
+if(createAdminUserBtn) {
+  createAdminUserBtn.onclick = async () => {
+    if(!adminAuth || !db) {
+      alert("O inicializador de contas administrativas falhou ou ainda não carregou.");
+      return;
+    }
 
-  if(!nome || !email || !senha) {
-    alert("Preencha todos os campos do formulário.");
-    return;
-  }
+    const nome = document.getElementById("newAdminNome").value.trim();
+    const email = document.getElementById("newAdminEmail").value.trim();
+    const senha = document.getElementById("newAdminSenha").value.trim();
+    const cargo = document.getElementById("newAdminCargo").value;
 
-  try {
-    createAdminUserBtn.disabled = true;
-    createAdminUserBtn.innerText = "Registrando...";
+    if(!nome || !email || !senha) {
+      alert("Por favor, preencha todos os campos de cadastro.");
+      return;
+    }
 
-    // Cria o login usando a instância isolada para não deslogar o Master atual
-    const userCredential = await adminAuth.createUserWithEmailAndPassword(email, senha);
-    const novoUid = userCredential.user.uid;
+    try {
+      createAdminUserBtn.disabled = true;
+      createAdminUserBtn.innerText = "Criando...";
 
-    // Vincula o nome e o cargo selecionado (Membro, Editor ou Master) ao documento do usuário
-    await db.collection("usuarios").doc(novoUid).set({
-      nome: nome,
-      cargo: cargo,
-      criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-    });
+      // Cria a credencial usando o app isolado para manter o Master logado na aba principal
+      const userCredential = await adminAuth.createUserWithEmailAndPassword(email, senha);
+      const novoUid = userCredential.user.uid;
 
-    alert(`Sucesso! Usuário '${nome}' cadastrado com o nível '${cargo}'.`);
-    
-    document.getElementById("newAdminNome").value = "";
-    document.getElementById("newAdminEmail").value = "";
-    document.getElementById("newAdminSenha").value = "";
-    
-    await adminAuth.signOut();
+      // Cria o documento de perfil na coleção 'usuarios' definindo o cargo (Membro, Editor ou Master)
+      await db.collection("usuarios").doc(novoUid).set({
+        nome: nome,
+        cargo: cargo,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
 
-  } catch(err) {
-    console.error(err);
-    alert("Erro ao criar credencial: " + err.message);
-  } finally {
-    createAdminUserBtn.disabled = false;
-    createAdminUserBtn.innerText = "Criar e Registrar Conta";
-  }
-};
+      alert(`Sucesso! Conta de '${nome}' registrada com nível de acesso '${cargo}'.`);
+      
+      document.getElementById("newAdminNome").value = "";
+      document.getElementById("newAdminEmail").value = "";
+      document.getElementById("newAdminSenha").value = "";
+      
+      await adminAuth.signOut();
+
+    } catch(err) {
+      console.error(err);
+      alert("Erro ao tentar registrar o usuário: " + err.message);
+    } finally {
+      createAdminUserBtn.disabled = false;
+      createAdminUserBtn.innerText = "Criar e Registrar Conta";
+    }
+  };
+}
