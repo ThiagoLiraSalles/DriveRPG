@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DriveRPG</title>
+  
+  <!-- VÍNCULO DO CSS: Garante que o visual minimalista escuro seja carregado -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="logoArea">
+      <h1>DriveRPG</h1>
+    </div>
+    <div class="userArea">
+      <span id="topUsername">Thiago</span>
+      <small id="topCargo">Master</small>
+    </div>
+  </header>
+
+  <!-- LOGIN -->
+  <section id="loginPage" class="page">
+    <div class="card card-login">
+      <h2>Login</h2>
+      <input id="email" type="email" placeholder="E-mail" />
+      <input id="senha" type="password" placeholder="Senha" />
+      <button id="loginBtn" type="button">Entrar</button>
+    </div>
+  </section>
+
+  <!-- SEARCH -->
+  <section id="searchPage" class="page hidden">
+    <div class="card">
+      <input id="searchInput" type="text" placeholder="Pesquisar ficha..." />
+    </div>
+    <div id="listaFichas"></div>
+  </section>
+
+  <!-- EDITOR / CRIAÇÃO E EDIÇÃO -->
+  <section id="editorPage" class="page hidden">
+    <div class="card">
+      <h2 id="editorTitle">Criar Ficha</h2>
+      <input id="nomeFicha" type="text" placeholder="Nome da ficha" />
+
+      <div class="toolbar-editor">
+        <button type="button" onclick="executarComando('bold')">B</button>
+        <button type="button" onclick="executarComando('italic')">I</button>
+        <button type="button" onclick="executarComando('underline')">U</button>
+        <button type="button" onclick="executarComando('insertUnorderedList')">• Lista</button>
+        <button type="button" onclick="inserirImagemUrl()">🖼️ +Imagem</button>
+      </div>
+
+      <div id="descricaoFicha" class="editorTextarea" contenteditable="true" data-placeholder="Cole o documento aqui, imagens ou links..."></div>
+
+      <button id="saveFichaBtn" type="button">Salvar Ficha</button>
+    </div>
+  </section>
+
+  <!-- PERFIL -->
+  <section id="profilePage" class="page hidden">
+    <div class="card">
+      <h2>Meu Perfil</h2>
+      <p id="profileInfo"></p>
+    </div>
+
+    <div id="masterAdminBox" class="card hidden">
+      <h2>Gerenciamento de Contas</h2>
+      <h3>Cadastrar Novo Usuário</h3>
+      <input id="newAdminNome" type="text" placeholder="Nome Completo" />
+      <input id="newAdminEmail" type="email" placeholder="E-mail" />
+      <input id="newAdminSenha" type="password" placeholder="Senha de Acesso" />
+
+      <div class="select-container">
+        <label for="newAdminCargo">Cargo do Usuário:</label>
+        <select id="newAdminCargo">
+          <option value="Membro">Membro</option>
+          <option value="Editor">Editor</option>
+          <option value="Master">Master</option>
+        </select>
+      </div>
+
+      <button id="createAdminUserBtn" type="button">Criar e Registrar Conta</button>
+    </div>
+  </section>
+
+  <!-- NAVBAR -->
+  <nav id="navbar" class="navbar hidden">
+    <button class="navBtn active" data-page="searchPage" type="button" title="Pesquisa">
+      <span class="navIcon">🔍</span>
+    </button>
+
+    <button id="editorNav" class="navBtn hidden" data-page="editorPage" type="button" title="Criar Ficha">
+      <span class="navIcon">📝</span>
+    </button>
+
+    <button class="navBtn" data-page="profilePage" type="button" title="Perfil">
+      <span class="navIcon">👤</span>
+    </button>
+
+    <button id="logoutBtn" class="navBtn logoutBtn" type="button" title="Sair">
+      <span class="navIcon">🚪</span>
+    </button>
+  </nav>
+
+  <!-- ============================================================ -->
+  <!-- SCRIPTS EXTERNOS DO FIREBASE (OBRIGATÓRIOS PARA WEB/PRODUÇÃO)-->
+  <!-- ============================================================ -->
+  <!-- Núcleo do Firebase SDK -->
+  <script src="https://gstatic.com"></script>
+  <!-- Recursos de Autenticação -->
+  <script src="https://gstatic.com"></script>
+  <!-- Banco de Dados Firestore -->
+  <script src="https://gstatic.com"></script>
+
+  <!-- VÍNCULO DO SEU JAVASCRIPT LOGICO (Deve ser o último da lista) -->
+  <script src="script.js"></script>
+</body>
+</html>
