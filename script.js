@@ -6,19 +6,28 @@ const firebaseConfig = {
   storageBucket: "driverpg-2c066.firebasestorage.app",
 };
 
-// Inicializa o app principal diretamente (Padrão de Produção para Vercel)
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
+// Inicialização direta e monitorada do Firebase
+try {
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+} catch (e) {
+  alert("Erro crítico na inicialização do Firebase: " + e.message);
 }
+
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// Inicializa o app secundário de forma limpa
+// Inicialização do app secundário para cadastro
 let adminApp;
-if (!firebase.apps.find(app => app.name === "AdminApp")) {
-  adminApp = firebase.initializeApp(firebaseConfig, "AdminApp");
-} else {
-  adminApp = firebase.app("AdminApp");
+try {
+  if (!firebase.apps.find(app => app.name === "AdminApp")) {
+    adminApp = firebase.initializeApp(firebaseConfig, "AdminApp");
+  } else {
+    adminApp = firebase.app("AdminApp");
+  }
+} catch (e) {
+  console.error("Erro no app secundário:", e);
 }
 const adminAuth = firebase.auth(adminApp);
 
@@ -93,7 +102,7 @@ if(descricaoEditor) {
   });
 }
 
-/* LÓGICA DE LOGIN */
+/* LÓGICA DE LOGIN COM ANÁLISE DE ERRO ATIVA */
 async function login(){
   const email = document.getElementById("email").value.trim();
   const senha = document.getElementById("senha").value.trim();
@@ -106,10 +115,14 @@ async function login(){
   try{
     loginBtn.disabled = true;
     loginBtn.innerText = "Entrando...";
+    
+    // Tenta autenticar no Firebase
     await auth.signInWithEmailAndPassword(email, senha);
+    
   }catch(err){
     console.error(err);
-    alert("Erro ao entrar: " + err.message);
+    // RASTREADOR VISUAL: Retorna o alerta direto na tela do celular informando o motivo exato
+    alert("Causa do travamento: " + err.code + " -> " + err.message);
   }finally{
     loginBtn.disabled = false;
     loginBtn.innerText = "Entrar";
@@ -174,7 +187,7 @@ auth.onAuthStateChanged(async user => {
     carregarFichas();
 
   } catch(err) {
-    console.error("Erro ao processar dados de acesso: ", err);
+    alert("Erro ao ler coleção 'usuarios': " + err.message);
   }
 });
 
@@ -212,7 +225,7 @@ if(saveFichaBtn) {
       limparFormularioFicha();
       showPage("searchPage");
     } catch(err) {
-      alert("Erro ao tentar salvar os dados: " + err.message);
+      alert("Erro ao salvar no Firestore: " + err.message);
     } finally {
       saveFichaBtn.disabled = false;
     }
@@ -235,7 +248,7 @@ function carregarFichas() {
   unsubscribeFichas = db.collection("fichas").orderBy("criadoEm", "desc")
     .onSnapshot(snapshot => {
       renderizarFichas(snapshot.docs);
-    }, err => console.error("Erro ao ler atualizações: ", err));
+    }, err => alert("Erro ao sincronizar fichas: " + err.message));
 }
 
 /* RENDERIZAR FICHAS COM BOTÕES POR CARGO */
@@ -354,7 +367,7 @@ if(createAdminUserBtn) {
 
     } catch(err) {
       console.error(err);
-      alert("Erro ao tentar registrar o usuário: " + err.message);
+      alert("Erro ao registrar novo login: " + err.message);
     } finally {
       createAdminUserBtn.disabled = false;
       createAdminUserBtn.innerText = "Criar e Registrar Conta";
